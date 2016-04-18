@@ -21,6 +21,8 @@ public:
 
 private slots:
     void on_actionOpen_file_triggered();
+    void on_strength_slider_valueChanged(int value);
+    void on_radius_slider_valueChanged(int value);
 
 private:
     Ui::MainWindow *ui;
@@ -28,6 +30,8 @@ private:
 
 private:
     BeautifulLabGLWidget * pBeautifulLabGLWidget;
+    int imageWidth;
+    int imageHeight;
 
 };
 

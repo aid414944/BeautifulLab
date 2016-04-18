@@ -24,12 +24,97 @@ void main(){
 
 static const char * fShaderStr = R"(
 #version 300 es
-precision mediump float;
+precision highp float;
 in vec2 v_texCoord;
 out vec4 outColor;
 uniform sampler2D textureSampler;
+
+uniform uint imageWidth;
+uniform uint imageHeight;
+uniform uint samplingRadius;
+uniform float strength;
+
 void main(){
-    outColor = texture(textureSampler, v_texCoord);
+
+    vec4 srcColor = texture(textureSampler, v_texCoord);
+    if (srcColor.r < 0.3725 || srcColor.g < 0.1569 || srcColor.b < 0.0784 || max(max(srcColor.r, srcColor.g), srcColor.b)-min(min(srcColor.r, srcColor.g), srcColor.b) < 0.0588 || abs(srcColor.r-srcColor.g) < 0.0588){
+        outColor = srcColor;
+        return;
+    }
+
+    float samplingStepLength;
+    float a;
+    float b;
+    float r;
+    if (imageWidth > imageHeight){
+        samplingStepLength = 1.0/float(imageHeight);
+                         a = float(imageHeight)/float(imageWidth);
+                         b = 1.0;
+                         r = float(samplingRadius)/float(imageHeight);
+    }else{
+        samplingStepLength = 1.0/float(imageWidth);
+                         a = 1.0;
+                         b = float(imageWidth)/float(imageHeight);
+                         r = float(samplingRadius)/float(imageWidth);
+    }
+
+    vec4 e_pow2 = vec4(0.0);
+    vec4 e_pow1 = vec4(0.0);
+    float num = 0.0;
+    for (float x = samplingStepLength; x < r; x+=samplingStepLength){
+        float max = sqrt(pow(r, 2.0)-pow(x, 2.0));
+        for (float y = samplingStepLength; y < max; y+=samplingStepLength){
+            vec4 temp;
+            temp = texture(textureSampler, vec2(a*x, b*y)+v_texCoord);
+            e_pow1 += temp;
+            e_pow2 += temp*temp;
+            temp = texture(textureSampler, vec2(-a*x, b*y)+v_texCoord);
+            e_pow1 += temp;
+            e_pow2 += temp*temp;
+            temp = texture(textureSampler, vec2(a*x, -b*y)+v_texCoord);
+            e_pow1 += temp;
+            e_pow2 += temp*temp;
+            temp = texture(textureSampler, vec2(-a*x, -b*y)+v_texCoord);
+            e_pow1 += temp;
+            e_pow2 += temp*temp;
+            num += 4.0;
+        }
+    }
+
+    for (float x = samplingStepLength; x < r; x+=samplingStepLength){
+        vec4 temp;
+        temp = texture(textureSampler, vec2(a*x, 0.0)+v_texCoord);
+        e_pow1 += temp;
+        e_pow2 += temp*temp;
+        temp = texture(textureSampler, vec2(-a*x, 0.0)+v_texCoord);
+        e_pow1 += temp;
+        e_pow2 += temp*temp;
+        num += 2.0;
+    }
+
+    for (float y = samplingStepLength; y < r; y+=samplingStepLength){
+        vec4 temp;
+        temp = texture(textureSampler, vec2(0.0, b*y)+v_texCoord);
+        e_pow1 += temp;
+        e_pow2 += temp*temp;
+        temp = texture(textureSampler, vec2(0.0, -b*y)+v_texCoord);
+        e_pow1 += temp;
+        e_pow2 += temp*temp;
+        num += 2.0;
+    }
+
+    e_pow1 += srcColor;
+    e_pow2 += srcColor*srcColor;
+    num += 1.0;
+
+    e_pow1 = e_pow1*255.0;
+    e_pow2 = e_pow2*255.0*255.0;
+    srcColor = srcColor*255.0;
+    vec4 m = e_pow1/num;
+    vec4 v = e_pow2/num-m*m;
+    vec4 k = v/(v+strength);
+
+    outColor = (k*(srcColor-m)+m)/255.0;
 }
 )";
 
@@ -79,10 +164,18 @@ void BeautifulLabGLWidget::initializeGL()
     GLint uniformVariable = glGetUniformLocation(program, "textureSampler");
     xScaleFactor = glGetUniformLocation(program, "xScaleFactor");
     yScaleFactor = glGetUniformLocation(program, "yScaleFactor");
+    imageWidthLocation = glGetUniformLocation(program, "imageWidth");
+    imageHeightLocation = glGetUniformLocation(program, "imageHeight");
+    samplingRadiusLocation = glGetUniformLocation(program, "samplingRadius");
+    strengthLocation = glGetUniformLocation(program, "strength");
     glUseProgram(program);
     glUniform1i(uniformVariable, 0);
     glUniform1f(xScaleFactor, 1.0f);
     glUniform1f(xScaleFactor, 1.0f);
+    glUniform1ui(imageWidthLocation, width());
+    glUniform1ui(imageHeightLocation, height());
+    glUniform1ui(samplingRadiusLocation, 0); // TODO
+    glUniform1f(strengthLocation, 0.0f); // TODO
     glUseProgram(0);
 
     glGenVertexArrays(1, &vao);
@@ -134,19 +227,31 @@ void BeautifulLabGLWidget::loadImage(QString path)
         deleteTexture(texture);
     }
     texture = bindTexture(image);
-    //    glActiveTexture(GL_TEXTURE0);
-    //    glBindTexture(GL_TEXTURE_2D, texture);
-    //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // TODO 设置纹理采样参数
 
     imageWidth = image.width();
     imageHeight = image.height();
+    glUniform1ui(imageWidthLocation, imageWidth);
+    glUniform1ui(imageHeightLocation, imageHeight);
     __updateScaleFactor();
 
     updateGL();
+}
+
+void BeautifulLabGLWidget::setSamplingRadius(int radius)
+{
+    glUniform1ui(samplingRadiusLocation, radius); // TODO
+}
+
+void BeautifulLabGLWidget::setBeautifulStrength(float strength)
+{
+    glUniform1f(strengthLocation, strength*50);
 }
 
 void BeautifulLabGLWidget::__updateScaleFactor()

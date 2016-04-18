@@ -23,6 +23,8 @@ private:
     int imageHeight;
 public:
     void loadImage(QString path);
+    void setSamplingRadius(int radius);
+    void setBeautifulStrength(float strength);
 
 
 private:
@@ -33,6 +35,10 @@ private:
     GLuint texture;
     GLint xScaleFactor;
     GLint yScaleFactor;
+    GLint imageWidthLocation;
+    GLint imageHeightLocation;
+    GLint samplingRadiusLocation;
+    GLint strengthLocation;
 private:
     void __updateScaleFactor();
     GLuint __loadShader(GLenum type, const char *shaderSrc);
