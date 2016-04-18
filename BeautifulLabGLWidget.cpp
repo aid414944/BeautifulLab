@@ -39,6 +39,7 @@ void main(){
     vec4 srcColor = texture(textureSampler, v_texCoord);
     if (srcColor.r < 0.3725 || srcColor.g < 0.1569 || srcColor.b < 0.0784 || max(max(srcColor.r, srcColor.g), srcColor.b)-min(min(srcColor.r, srcColor.g), srcColor.b) < 0.0588 || abs(srcColor.r-srcColor.g) < 0.0588){
         outColor = srcColor;
+        outColor.rgb = outColor.rgb+vec3(strength*0.001);
         return;
     }
 
@@ -115,6 +116,7 @@ void main(){
     vec4 k = v/(v+strength);
 
     outColor = (k*(srcColor-m)+m)/255.0;
+    outColor.rgb = outColor.rgb+vec3(strength*0.001);
 }
 )";
 
@@ -251,7 +253,7 @@ void BeautifulLabGLWidget::setSamplingRadius(int radius)
 
 void BeautifulLabGLWidget::setBeautifulStrength(float strength)
 {
-    glUniform1f(strengthLocation, strength*50);
+    glUniform1f(strengthLocation, strength*100);
 }
 
 void BeautifulLabGLWidget::__updateScaleFactor()
